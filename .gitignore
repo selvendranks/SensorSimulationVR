@@ -1,0 +1,36 @@
+# Unity generated folders
+Library/
+Temp/
+Obj/
+Logs/
+UserSettings/
+MemoryCaptures/
+Artifacts/
+
+# Builds
+Build/
+Builds/
+
+# Visual Studio / Rider
+.vs/
+*.csproj
+*.sln
+*.user
+*.unityproj
+*.pidb
+*.svd
+*.pdb
+*.mdb
+
+# Crash logs
+*.stacktrace
+
+# OS junk
+*.DS_Store
+
+# Unity packages
+*.unitypackage
+
+# Android builds
+*.apk
+*.aab
