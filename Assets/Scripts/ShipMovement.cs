@@ -2,22 +2,24 @@ using UnityEngine;
 
 public class MoveAlongX : MonoBehaviour
 {
-    [SerializeField] private float startX = 5f;
     [SerializeField] private float endX = 40f;
     [SerializeField] private float speed = 2f;
+    [SerializeField] private float stopThreshold = 0.001f;
 
-    private int direction = 1;
+    public bool HasReachedDestination { get; private set; }
 
     void Update()
     {
-        // Move along X axis
-        transform.Translate(Vector3.right * direction * speed * Time.deltaTime, Space.World);
+        if (HasReachedDestination)
+            return;
 
-        // Check bounds and flip direction
-        if (transform.position.x >= endX)
-            direction = -1;
+        Vector3 targetPosition = new Vector3(endX, transform.position.y, transform.position.z);
+        transform.position = Vector3.MoveTowards(transform.position, targetPosition, speed * Time.deltaTime);
 
-        if (transform.position.x <= startX)
-            direction = 1;
+        if (Mathf.Abs(transform.position.x - endX) <= stopThreshold)
+        {
+            transform.position = targetPosition;
+            HasReachedDestination = true;
+        }
     }
 }
