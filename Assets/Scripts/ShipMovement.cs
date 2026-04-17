@@ -15,9 +15,9 @@ public class MoveAlongX : MonoBehaviour
 
         // Check bounds and flip direction
         if (transform.position.x >= endX)
-            direction = 1;
+            direction = -1;
 
         if (transform.position.x <= startX)
-            direction = -1;
+            direction = 1;
     }
 }
