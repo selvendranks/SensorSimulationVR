@@ -8,27 +8,14 @@ public class Sonar : MonoBehaviour
     [SerializeField] private int raysPerFan = 30;
     [SerializeField] private float maxRayDistance = 50f;
 
-    [Header("Visualisation")]
-    [SerializeField] private GameObject hitQuadPrefab;
-    [SerializeField] private float hitOffset = 0.02f;
-    [SerializeField] private bool clearPreviousHits = true;
-
     [Header("Line Visuals")]
     [SerializeField] private Material lineMaterial;
     [SerializeField] private float lineWidth = 0.02f;
-    [SerializeField] private Color hitColor = Color.green;
-    [SerializeField] private Color missColor = Color.cyan;
 
     private readonly List<LineRenderer> lineRenderers = new();
-    private readonly List<GameObject> spawnedHits = new();
 
     private void Start()
     {
-        if (lineMaterial == null)
-        {
-            lineMaterial = new Material(Shader.Find("Sprites/Default"));
-        }
-
         CreateLineRenderers();
     }
 
@@ -63,9 +50,6 @@ public class Sonar : MonoBehaviour
 
     private void ScanFan()
     {
-        if (clearPreviousHits)
-            ClearHitQuads();
-
         if (lineRenderers.Count != raysPerFan)
             CreateLineRenderers();
 
@@ -82,42 +66,15 @@ public class Sonar : MonoBehaviour
             Vector3 start = transform.position;
             Vector3 end = start + direction * maxRayDistance;
 
-            LineRenderer lr = lineRenderers[i];
-
             if (Physics.Raycast(start, direction, out RaycastHit hit, maxRayDistance))
             {
                 end = hit.point;
-                lr.startColor = hitColor;
-                lr.endColor = hitColor;
-
-                if (hitQuadPrefab != null)
-                {
-                    Vector3 spawnPos = hit.point + hit.normal * hitOffset;
-                    Quaternion spawnRot = Quaternion.LookRotation(hit.normal);
-                    GameObject quad = Instantiate(hitQuadPrefab, spawnPos, spawnRot);
-                    spawnedHits.Add(quad);
-                }
-            }
-            else
-            {
-                lr.startColor = missColor;
-                lr.endColor = missColor;
             }
 
+            LineRenderer lr = lineRenderers[i];
             lr.SetPosition(0, start);
             lr.SetPosition(1, end);
         }
-    }
-
-    private void ClearHitQuads()
-    {
-        for (int i = 0; i < spawnedHits.Count; i++)
-        {
-            if (spawnedHits[i] != null)
-                Destroy(spawnedHits[i]);
-        }
-
-        spawnedHits.Clear();
     }
 
     private void ClearLineRenderers()
