@@ -12,11 +12,25 @@ public class Sonar : MonoBehaviour
     [SerializeField] private Material lineMaterial;
     [SerializeField] private float lineWidth = 0.02f;
 
+    [Header("Hit Point Visuals")]
+    [SerializeField] private Material hitQuadMaterial;
+    [SerializeField] private float hitQuadSize = 0.05f;
+    [SerializeField] private Transform hitPointsParent;
+    [SerializeField] private float minDistanceBetweenPoints = 0.1f;
+
     private readonly List<LineRenderer> lineRenderers = new();
+    private readonly List<GameObject> spawnedHitQuads = new();
+    private readonly List<Vector3> hitPoints = new();
 
     private void Start()
     {
         CreateLineRenderers();
+
+        if (hitPointsParent == null)
+        {
+            GameObject parentObj = new GameObject("SonarHitPoints");
+            hitPointsParent = parentObj.transform;
+        }
     }
 
     private void Update()
@@ -69,12 +83,61 @@ public class Sonar : MonoBehaviour
             if (Physics.Raycast(start, direction, out RaycastHit hit, maxRayDistance))
             {
                 end = hit.point;
+                TrySpawnHitQuad(hit);
             }
 
             LineRenderer lr = lineRenderers[i];
             lr.SetPosition(0, start);
             lr.SetPosition(1, end);
         }
+    }
+
+    private void TrySpawnHitQuad(RaycastHit hit)
+    {
+        Vector3 hitPoint = hit.point;
+
+        for (int i = 0; i < hitPoints.Count; i++)
+        {
+            if (Vector3.Distance(hitPoints[i], hitPoint) < minDistanceBetweenPoints)
+                return;
+        }
+
+        hitPoints.Add(hitPoint);
+
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        quad.name = "SonarHitQuad";
+        quad.transform.SetParent(hitPointsParent);
+        quad.transform.position = hitPoint;
+        quad.transform.localScale = Vector3.one * hitQuadSize;
+
+        quad.transform.rotation = Quaternion.LookRotation(hit.normal);
+
+        Collider col = quad.GetComponent<Collider>();
+        if (col != null)
+            Destroy(col);
+
+        Renderer renderer = quad.GetComponent<Renderer>();
+        if (renderer != null && hitQuadMaterial != null)
+            renderer.material = hitQuadMaterial;
+
+        spawnedHitQuads.Add(quad);
+    }
+
+    public void ClearHitQuads()
+    {
+        for (int i = 0; i < spawnedHitQuads.Count; i++)
+        {
+            if (spawnedHitQuads[i] != null)
+                Destroy(spawnedHitQuads[i]);
+        }
+
+        spawnedHitQuads.Clear();
+        hitPoints.Clear();
+    }
+
+    public List<Vector3> GetHitPoints()
+    {
+        return new List<Vector3>(hitPoints);
     }
 
     private void ClearLineRenderers()
