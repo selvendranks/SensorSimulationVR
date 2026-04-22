@@ -27,7 +27,7 @@ public class Sonar : MonoBehaviour
     private readonly List<Vector3> hitPoints = new();
     private readonly List<List<Vector3>> scanRows = new();
 
-    private bool hasStoppedScanning;
+    private bool wasScanningLastFrame;
 
     private void Start()
     {
@@ -41,27 +41,32 @@ public class Sonar : MonoBehaviour
             GameObject parentObj = new GameObject("SonarHitPoints");
             hitPointsParent = parentObj.transform;
         }
+
+        HideSonarLines();
     }
 
     private void Update()
     {
-        if (shipMovement != null && shipMovement.HasReachedDestination)
+        if (shipMovement == null)
+            return;
+
+        if (!shipMovement.IsMoving)
         {
-            if (!hasStoppedScanning)
+            if (wasScanningLastFrame)
             {
                 HideSonarLines();
-                hasStoppedScanning = true;
-                Log("Ship reached destination. Sonar stopped.");
+                wasScanningLastFrame = false;
+                Log("Ship stopped or has not started yet. Sonar hidden.");
             }
 
             return;
         }
 
-        if (hasStoppedScanning)
+        if (!wasScanningLastFrame)
         {
             ShowSonarLines();
-            hasStoppedScanning = false;
-            Log("Ship moved again. Sonar resumed.");
+            wasScanningLastFrame = true;
+            Log("Ship started moving. Sonar scanning started.");
         }
 
         ScanFan();
@@ -86,6 +91,7 @@ public class Sonar : MonoBehaviour
             lr.useWorldSpace = true;
             lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             lr.receiveShadows = false;
+            lr.enabled = false;
 
             lineRenderers.Add(lr);
         }
