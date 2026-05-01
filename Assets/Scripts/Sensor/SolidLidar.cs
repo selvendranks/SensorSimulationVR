@@ -11,6 +11,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     [Header("Quad Visualization")]
     [SerializeField] private GameObject quadPrefab;
     [SerializeField] private float quadSize = 0.04f;
+    [SerializeField] private int maxPoints = 5000;
 
     [Header("Scan Settings")]
     [SerializeField] private float maxDistance = 50f;
@@ -23,6 +24,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     private int HorizontalRayCount => Mathf.Max(1, Mathf.CeilToInt(horizontalAngleDeg * raysPerDegree));
     private int VerticalRayCount => Mathf.Max(1, Mathf.CeilToInt(verticalAngleDeg * raysPerDegree));
     private int TotalRayCount => HorizontalRayCount * VerticalRayCount;
+    private int VisualPointCount => Mathf.Min(maxPoints, TotalRayCount);
     private float ScanInterval => scanHz > 0f ? 1f / scanHz : 0f;
 
     private void Start()
@@ -49,7 +51,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         {
             scanTimer = 0f;
 
-            if (quadPool.Count != TotalRayCount)
+            if (quadPool.Count != VisualPointCount)
                 RebuildPool();
 
             PerformScan();
@@ -118,7 +120,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
         quadPool.Clear();
 
-        for (int i = 0; i < TotalRayCount; i++)
+        for (int i = 0; i < VisualPointCount; i++)
         {
             GameObject quad = Instantiate(quadPrefab, transform);
             quad.name = $"LidarQuad_{i}";
