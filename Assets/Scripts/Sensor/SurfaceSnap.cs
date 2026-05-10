@@ -1,20 +1,46 @@
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 public class SurfaceTouchDetector : MonoBehaviour
 {
-    public string surfaceTag = "SnapSurface";
+    [Header("Surface")]
+    [SerializeField] private string surfaceTag = "SnapSurface";
 
+    [Header("Auto Find")]
+    [SerializeField] private string hapticPlayerObjectName = "HapticPlayer";
+    [SerializeField] private string newParentObjectName = "SensorAnchor";
+
+    [Header("Optional Direct References")]
     [SerializeField] private HapticImpulsePlayer hapticPlayer;
     [SerializeField] private Transform newParent;
 
-    private UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable grab;
+    private XRGrabInteractable grab;
 
-    void Start()
+    private void Awake()
     {
-        grab = GetComponentInParent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
-        Debug.Log("[SurfaceTouch] Grab reference initialized.");
+        grab = GetComponentInParent<XRGrabInteractable>();
+
+        if (hapticPlayer == null)
+        {
+            GameObject hapticObject = GameObject.Find(hapticPlayerObjectName);
+            if (hapticObject != null)
+                hapticPlayer = hapticObject.GetComponent<HapticImpulsePlayer>();
+
+            if (hapticPlayer == null)
+                hapticPlayer = FindFirstObjectByType<HapticImpulsePlayer>();
+        }
+
+        if (newParent == null)
+        {
+            GameObject parentObject = GameObject.Find(newParentObjectName);
+            if (parentObject != null)
+                newParent = parentObject.transform;
+        }
+
+        Debug.Log($"[SurfaceTouch] Grab reference initialized: {(grab != null)}");
+        Debug.Log($"[SurfaceTouch] Haptic player found: {(hapticPlayer != null ? hapticPlayer.name : "NULL")}");
+        Debug.Log($"[SurfaceTouch] New parent found: {(newParent != null ? newParent.name : "NULL")}");
     }
 
     private void OnTriggerEnter(Collider other)
@@ -52,7 +78,7 @@ public class SurfaceTouchDetector : MonoBehaviour
     {
         if (newParent == null)
         {
-            Debug.Log("[SurfaceTouch] newParent is NULL. Cannot parent object.");
+            Debug.LogWarning("[SurfaceTouch] newParent is NULL. Cannot parent object.");
             return;
         }
 
@@ -64,6 +90,9 @@ public class SurfaceTouchDetector : MonoBehaviour
 
     private void DetachGrabbedObject()
     {
+        if (grab == null)
+            return;
+
         Transform grabbedRoot = grab.transform;
         grabbedRoot.SetParent(null, true);
 
@@ -74,7 +103,7 @@ public class SurfaceTouchDetector : MonoBehaviour
     {
         if (hapticPlayer == null)
         {
-            Debug.Log("[SurfaceTouch] HapticImpulsePlayer is NULL.");
+            Debug.LogWarning("[SurfaceTouch] HapticImpulsePlayer is NULL.");
             return;
         }
 

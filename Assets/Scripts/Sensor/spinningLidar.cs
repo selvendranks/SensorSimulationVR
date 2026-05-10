@@ -17,6 +17,10 @@ public class SpinningLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private float maxDistance = 50f;
     [SerializeField] private LayerMask collisionMask = ~0;
 
+    [Header("Optional Shared Settings")]
+    [SerializeField] private SpinningLidarGlobalSettings globalSettings;
+    [SerializeField] private string globalSettingsObjectName = "SpinningLidarGlobalSettings";
+
     private readonly List<GameObject> quadPool = new();
     private float currentYawDeg;
     private int nextQuadIndex;
@@ -30,13 +34,42 @@ public class SpinningLidarQuadVisualizer : MonoBehaviour
             return;
         }
 
+        AttachGlobalSettingsIfNeeded();
         BuildPool();
     }
 
     private void Update()
     {
+        if (globalSettings != null)
+        {
+            raysPerVerticalLine = globalSettings.RaysPerVerticalLine;
+            verticalAngleDeg = globalSettings.VerticalAngleDeg;
+            maxDistance = globalSettings.MaxDistance;
+        }
+
         currentYawDeg = Mathf.Repeat(currentYawDeg + spinningSpeedDegPerSec * Time.deltaTime, 360f);
         ScanVerticalFanAtYaw(currentYawDeg);
+    }
+
+    private void AttachGlobalSettingsIfNeeded()
+    {
+        if (globalSettings != null)
+            return;
+
+        GameObject settingsObject = GameObject.Find(globalSettingsObjectName);
+        if (settingsObject != null)
+        {
+            globalSettings = settingsObject.GetComponent<SpinningLidarGlobalSettings>();
+        }
+
+        if (globalSettings == null)
+        {
+            globalSettings = FindFirstObjectByType<SpinningLidarGlobalSettings>();
+        }
+
+        Debug.Log(globalSettings != null
+            ? $"[{name}] Attached SpinningLidarGlobalSettings: {globalSettings.name}"
+            : $"[{name}] SpinningLidarGlobalSettings not found.");
     }
 
     private void ScanVerticalFanAtYaw(float yawDeg)

@@ -18,6 +18,10 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private float scanHz = 2f;
     [SerializeField] private LayerMask collisionMask = ~0;
 
+    [Header("Optional Shared Settings")]
+    [SerializeField] private SolidLidarGlobalSettings globalSettings;
+    [SerializeField] private string globalSettingsObjectName = "SolidLidarGlobalSettings";
+
     private readonly List<GameObject> quadPool = new();
     private float scanTimer;
 
@@ -36,12 +40,21 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
             return;
         }
 
+        AttachGlobalSettingsIfNeeded();
         RebuildPool();
         PerformScan();
     }
 
     private void Update()
     {
+        if (globalSettings != null)
+        {
+            horizontalAngleDeg = globalSettings.HorizontalAngleDeg;
+            verticalAngleDeg = globalSettings.VerticalAngleDeg;
+            raysPerDegree = globalSettings.RaysPerDegree;
+            maxDistance = globalSettings.MaxDistance;
+        }
+
         if (scanHz <= 0f)
             return;
 
@@ -56,6 +69,27 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
             PerformScan();
         }
+    }
+
+    private void AttachGlobalSettingsIfNeeded()
+    {
+        if (globalSettings != null)
+            return;
+
+        GameObject settingsObject = GameObject.Find(globalSettingsObjectName);
+        if (settingsObject != null)
+        {
+            globalSettings = settingsObject.GetComponent<SolidLidarGlobalSettings>();
+        }
+
+        if (globalSettings == null)
+        {
+            globalSettings = FindFirstObjectByType<SolidLidarGlobalSettings>();
+        }
+
+        Debug.Log(globalSettings != null
+            ? $"[{name}] Attached SolidLidarGlobalSettings: {globalSettings.name}"
+            : $"[{name}] SolidLidarGlobalSettings not found.");
     }
 
     private void PerformScan()
