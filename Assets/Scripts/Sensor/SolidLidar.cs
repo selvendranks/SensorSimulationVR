@@ -32,26 +32,9 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     private int currentRow;
     private int nextQuadIndex;
 
-    // Change detection
-    private float lastHorizontalAngleDeg;
-    private float lastVerticalAngleDeg;
-    private float lastRaysPerDegree;
-    private int lastMaxPoints;
-
     private int HorizontalRayCount => Mathf.Max(1, Mathf.CeilToInt(horizontalAngleDeg * raysPerDegree));
     private int VerticalRayCount => Mathf.Max(1, Mathf.CeilToInt(verticalAngleDeg * raysPerDegree));
-    private int TotalRayCount => HorizontalRayCount * VerticalRayCount;
-    private int VisualPointCount => Mathf.Min(maxPoints, TotalRayCount);
     private float ScanInterval => scanHz > 0f ? 1f / scanHz : 0f;
-
-    private bool PoolSizeChanged =>
-        quadPool.Count != VisualPointCount;
-
-    private bool ScanSettingsChanged =>
-        !Mathf.Approximately(horizontalAngleDeg, lastHorizontalAngleDeg) ||
-        !Mathf.Approximately(verticalAngleDeg, lastVerticalAngleDeg) ||
-        !Mathf.Approximately(raysPerDegree, lastRaysPerDegree) ||
-        maxPoints != lastMaxPoints;
 
     private void Start()
     {
@@ -64,29 +47,12 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
         AttachGlobalSettingsIfNeeded();
         AttachPointCloudRootIfNeeded();
-        PullGlobalSettings();
-        RebuildPool();
-        SnapshotSettings();
-        BeginNewSweep();
+        BuildPool();
     }
 
     private void Update()
     {
         PullGlobalSettings();
-
-        if (ScanSettingsChanged)
-        {
-            bool needsRebuild = PoolSizeChanged;
-
-            SnapshotSettings();
-
-            if (needsRebuild)
-                RebuildPool();
-
-            HideAllQuads();
-            BeginNewSweep();
-            return;
-        }
 
         if (scanHz <= 0f)
             return;
@@ -108,14 +74,6 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         verticalAngleDeg = globalSettings.VerticalAngleDeg;
         raysPerDegree = globalSettings.RaysPerDegree;
         maxDistance = globalSettings.MaxDistance;
-    }
-
-    private void SnapshotSettings()
-    {
-        lastHorizontalAngleDeg = horizontalAngleDeg;
-        lastVerticalAngleDeg = verticalAngleDeg;
-        lastRaysPerDegree = raysPerDegree;
-        lastMaxPoints = maxPoints;
     }
 
     private void AttachGlobalSettingsIfNeeded()
@@ -152,12 +110,6 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         Debug.LogWarning($"[{name}] PointCloudRoot object '{pointCloudRootObjectName}' not found in scene.", this);
     }
 
-    private void BeginNewSweep()
-    {
-        currentRow = 0;
-        nextQuadIndex = 0;
-    }
-
     private void ScanNextRows()
     {
         if (VerticalRayCount <= 0 || HorizontalRayCount <= 0) return;
@@ -168,22 +120,13 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         for (int rowStep = 0; rowStep < rowsThisStep; rowStep++)
         {
             if (currentRow >= VerticalRayCount)
-            {
-                HideQuadsFrom(nextQuadIndex);
-                BeginNewSweep();
-            }
+                currentRow = 0;
 
             float vT = VerticalRayCount <= 1 ? 0.5f : (float)currentRow / (VerticalRayCount - 1);
             float pitch = Mathf.Lerp(verticalAngleDeg * 0.5f, -verticalAngleDeg * 0.5f, vT);
 
             for (int h = 0; h < HorizontalRayCount; h++)
             {
-                if (nextQuadIndex >= quadPool.Count)
-                {
-                    currentRow = VerticalRayCount;
-                    return;
-                }
-
                 float hT = HorizontalRayCount <= 1 ? 0.5f : (float)h / (HorizontalRayCount - 1);
                 float yaw = Mathf.Lerp(-horizontalAngleDeg * 0.5f, horizontalAngleDeg * 0.5f, hT);
 
@@ -201,7 +144,8 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
                     quad.transform.localScale = Vector3.one * quadSize;
                     quad.SetActive(true);
-                    nextQuadIndex++;
+
+                    nextQuadIndex = (nextQuadIndex + 1) % quadPool.Count;
                 }
             }
 
@@ -221,24 +165,18 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         ).normalized;
     }
 
-    private void RebuildPool()
+    private void BuildPool()
     {
         if (pointCloudRoot == null)
         {
-            Debug.LogError($"[{name}] Cannot rebuild pool — PointCloudRoot is missing.", this);
+            Debug.LogError($"[{name}] Cannot build pool — PointCloudRoot is missing.", this);
             enabled = false;
             return;
         }
 
-        for (int i = 0; i < quadPool.Count; i++)
-        {
-            if (quadPool[i] != null)
-                Destroy(quadPool[i]);
-        }
-
         quadPool.Clear();
 
-        for (int i = 0; i < VisualPointCount; i++)
+        for (int i = 0; i < maxPoints; i++)
         {
             GameObject quad = Instantiate(quadPrefab, pointCloudRoot);
             quad.name = $"LidarQuad_{i}";
@@ -246,25 +184,8 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
             quadPool.Add(quad);
         }
 
-        Debug.Log($"[{name}] Rebuilt quad pool with {VisualPointCount} points.", this);
-    }
-
-    private void HideAllQuads()
-    {
-        for (int i = 0; i < quadPool.Count; i++)
-        {
-            if (quadPool[i] != null)
-                quadPool[i].SetActive(false);
-        }
-    }
-
-    private void HideQuadsFrom(int startIndex)
-    {
-        for (int i = startIndex; i < quadPool.Count; i++)
-        {
-            if (quadPool[i] != null)
-                quadPool[i].SetActive(false);
-        }
+        nextQuadIndex = 0;
+        Debug.Log($"[{name}] Built quad pool with {maxPoints} points.", this);
     }
 
     private void OnDrawGizmosSelected()
