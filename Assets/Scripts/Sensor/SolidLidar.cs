@@ -12,11 +12,16 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private GameObject quadPrefab;
     [SerializeField] private float quadSize = 0.04f;
     [SerializeField] private int maxPoints = 5000;
+    [SerializeField] private Transform pointCloudRoot;
+    [SerializeField] private string pointCloudRootObjectName = "PointCloudRoot";
 
     [Header("Scan Settings")]
     [SerializeField] private float maxDistance = 50f;
     [SerializeField] private float scanHz = 2f;
     [SerializeField] private LayerMask collisionMask = ~0;
+
+    [Header("Progressive Scan")]
+    [SerializeField] private int rowsPerUpdate = 1;
 
     [Header("Optional Shared Settings")]
     [SerializeField] private SolidLidarGlobalSettings globalSettings;
@@ -24,6 +29,8 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
     private readonly List<GameObject> quadPool = new();
     private float scanTimer;
+    private int currentRow;
+    private int nextQuadIndex;
 
     private int HorizontalRayCount => Mathf.Max(1, Mathf.CeilToInt(horizontalAngleDeg * raysPerDegree));
     private int VerticalRayCount => Mathf.Max(1, Mathf.CeilToInt(verticalAngleDeg * raysPerDegree));
@@ -41,8 +48,9 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         }
 
         AttachGlobalSettingsIfNeeded();
+        AttachPointCloudRootIfNeeded();
         RebuildPool();
-        PerformScan();
+        BeginNewSweep();
     }
 
     private void Update()
@@ -55,6 +63,12 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
             maxDistance = globalSettings.MaxDistance;
         }
 
+        if (quadPool.Count != VisualPointCount)
+        {
+            RebuildPool();
+            BeginNewSweep();
+        }
+
         if (scanHz <= 0f)
             return;
 
@@ -63,11 +77,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         if (scanTimer >= ScanInterval)
         {
             scanTimer = 0f;
-
-            if (quadPool.Count != VisualPointCount)
-                RebuildPool();
-
-            PerformScan();
+            ScanNextRows();
         }
     }
 
@@ -87,25 +97,65 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
             globalSettings = FindFirstObjectByType<SolidLidarGlobalSettings>();
         }
 
-        Debug.Log(globalSettings != null
-            ? $"[{name}] Attached SolidLidarGlobalSettings: {globalSettings.name}"
-            : $"[{name}] SolidLidarGlobalSettings not found.");
+        Debug.Log(
+            globalSettings != null
+                ? $"[{name}] Attached SolidLidarGlobalSettings: {globalSettings.name}"
+                : $"[{name}] SolidLidarGlobalSettings not found.",
+            this
+        );
     }
 
-    private void PerformScan()
+    private void AttachPointCloudRootIfNeeded()
     {
-        HideAllQuads();
+        if (pointCloudRoot != null)
+            return;
+
+        GameObject rootObject = GameObject.Find(pointCloudRootObjectName);
+
+        if (rootObject != null)
+        {
+            pointCloudRoot = rootObject.transform;
+            Debug.Log($"[{name}] Attached PointCloudRoot: {pointCloudRoot.name}", this);
+            return;
+        }
+
+        Debug.LogWarning($"[{name}] PointCloudRoot object '{pointCloudRootObjectName}' not found in scene.", this);
+    }
+
+    private void BeginNewSweep()
+    {
+        currentRow = 0;
+        nextQuadIndex = 0;
+    }
+
+    private void ScanNextRows()
+    {
+        if (VerticalRayCount <= 0 || HorizontalRayCount <= 0)
+            return;
 
         Vector3 origin = transform.position;
-        int activeQuadIndex = 0;
+        int rowsThisStep = Mathf.Max(1, rowsPerUpdate);
 
-        for (int v = 0; v < VerticalRayCount; v++)
+        for (int rowStep = 0; rowStep < rowsThisStep; rowStep++)
         {
-            float vT = VerticalRayCount <= 1 ? 0.5f : (float)v / (VerticalRayCount - 1);
-            float pitch = Mathf.Lerp(-verticalAngleDeg * 0.5f, verticalAngleDeg * 0.5f, vT);
+            if (currentRow >= VerticalRayCount)
+            {
+                BeginNewSweep(); // resets currentRow = 0, nextQuadIndex = 0
+                                 // Don't return — continue scanning from row 0
+            }
+
+            float vT = VerticalRayCount <= 1 ? 0.5f : (float)currentRow / (VerticalRayCount - 1);
+            float pitch = Mathf.Lerp(verticalAngleDeg * 0.5f, -verticalAngleDeg * 0.5f, vT);
 
             for (int h = 0; h < HorizontalRayCount; h++)
             {
+                if (nextQuadIndex >= quadPool.Count)
+                {
+                    // Pool exhausted mid-row — begin new sweep next tick
+                    currentRow = VerticalRayCount;
+                    return;
+                }
+
                 float hT = HorizontalRayCount <= 1 ? 0.5f : (float)h / (HorizontalRayCount - 1);
                 float yaw = Mathf.Lerp(-horizontalAngleDeg * 0.5f, horizontalAngleDeg * 0.5f, hT);
 
@@ -114,21 +164,20 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
                 if (Physics.Raycast(origin, worldDirection, out RaycastHit hit, maxDistance, collisionMask))
                 {
-                    if (activeQuadIndex < quadPool.Count)
-                    {
-                        GameObject quad = quadPool[activeQuadIndex];
-                        quad.transform.position = hit.point;
+                    GameObject quad = quadPool[nextQuadIndex];
+                    quad.transform.position = hit.point;
 
-                        Vector3 toSensor = origin - hit.point;
-                        if (toSensor.sqrMagnitude > 0.0001f)
-                            quad.transform.rotation = Quaternion.LookRotation(toSensor.normalized);
+                    Vector3 toSensor = origin - hit.point;
+                    if (toSensor.sqrMagnitude > 0.0001f)
+                        quad.transform.rotation = Quaternion.LookRotation(toSensor.normalized);
 
-                        quad.transform.localScale = Vector3.one * quadSize;
-                        quad.SetActive(true);
-                        activeQuadIndex++;
-                    }
+                    quad.transform.localScale = Vector3.one * quadSize;
+                    quad.SetActive(true);
+                    nextQuadIndex++;
                 }
             }
+
+            currentRow++;
         }
     }
 
@@ -146,6 +195,13 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
     private void RebuildPool()
     {
+        if (pointCloudRoot == null)
+        {
+            Debug.LogError($"[{name}] Cannot rebuild pool because PointCloudRoot is missing.", this);
+            enabled = false;
+            return;
+        }
+
         for (int i = 0; i < quadPool.Count; i++)
         {
             if (quadPool[i] != null)
@@ -156,21 +212,15 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
         for (int i = 0; i < VisualPointCount; i++)
         {
-            GameObject quad = Instantiate(quadPrefab, transform);
+            GameObject quad = Instantiate(quadPrefab, pointCloudRoot);
             quad.name = $"LidarQuad_{i}";
             quad.SetActive(false);
             quadPool.Add(quad);
         }
+
+        Debug.Log($"[{name}] Rebuilt quad pool with {VisualPointCount} points.", this);
     }
 
-    private void HideAllQuads()
-    {
-        for (int i = 0; i < quadPool.Count; i++)
-        {
-            if (quadPool[i] != null)
-                quadPool[i].SetActive(false);
-        }
-    }
 
     private void OnDrawGizmosSelected()
     {

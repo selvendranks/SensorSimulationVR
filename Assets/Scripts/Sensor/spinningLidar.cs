@@ -12,6 +12,8 @@ public class SpinningLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private GameObject quadPrefab;
     [SerializeField] private float quadSize = 0.04f;
     [SerializeField] private int maxPoints = 50000;
+    [SerializeField] private Transform pointCloudRoot;
+    [SerializeField] private string pointCloudRootObjectName = "PointCloudRoot";
 
     [Header("Scan Settings")]
     [SerializeField] private float maxDistance = 50f;
@@ -35,6 +37,7 @@ public class SpinningLidarQuadVisualizer : MonoBehaviour
         }
 
         AttachGlobalSettingsIfNeeded();
+        EnsurePointCloudRoot();
         BuildPool();
     }
 
@@ -49,6 +52,23 @@ public class SpinningLidarQuadVisualizer : MonoBehaviour
 
         currentYawDeg = Mathf.Repeat(currentYawDeg + spinningSpeedDegPerSec * Time.deltaTime, 360f);
         ScanVerticalFanAtYaw(currentYawDeg);
+    }
+
+    private void EnsurePointCloudRoot()
+    {
+        if (pointCloudRoot != null)
+            return;
+
+        GameObject rootObject = GameObject.Find(pointCloudRootObjectName);
+
+        if (rootObject != null)
+        {
+            pointCloudRoot = rootObject.transform;
+            Debug.Log($"[{name}] Attached PointCloudRoot: {pointCloudRoot.name}", this);
+            return;
+        }
+
+        Debug.LogWarning($"[{name}] PointCloudRoot object '{pointCloudRootObjectName}' not found in scene.", this);
     }
 
     private void AttachGlobalSettingsIfNeeded()
@@ -119,7 +139,7 @@ public class SpinningLidarQuadVisualizer : MonoBehaviour
 
         for (int i = 0; i < maxPoints; i++)
         {
-            GameObject quad = Instantiate(quadPrefab, transform);
+            GameObject quad = Instantiate(quadPrefab, pointCloudRoot);
             quad.name = $"LidarQuad_{i}";
             quad.SetActive(false);
             quadPool.Add(quad);
