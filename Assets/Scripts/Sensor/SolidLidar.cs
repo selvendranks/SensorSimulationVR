@@ -7,6 +7,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private float horizontalAngleDeg = 120f;
     [SerializeField] private float verticalAngleDeg = 40f;
     [SerializeField] private float raysPerDegree = 2f;
+    [SerializeField] private float maxDistance = 50f;
 
     [Header("Quad Visualization")]
     [SerializeField] private GameObject quadPrefab;
@@ -16,7 +17,6 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private string pointCloudRootObjectName = "PointCloudRoot";
 
     [Header("Scan Settings")]
-    [SerializeField] private float maxDistance = 50f;
     [SerializeField] private float scanHz = 2f;
     [SerializeField] private LayerMask collisionMask = ~0;
 
@@ -32,11 +32,26 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     private int currentRow;
     private int nextQuadIndex;
 
+    // Change detection
+    private float lastHorizontalAngleDeg;
+    private float lastVerticalAngleDeg;
+    private float lastRaysPerDegree;
+    private int lastMaxPoints;
+
     private int HorizontalRayCount => Mathf.Max(1, Mathf.CeilToInt(horizontalAngleDeg * raysPerDegree));
     private int VerticalRayCount => Mathf.Max(1, Mathf.CeilToInt(verticalAngleDeg * raysPerDegree));
     private int TotalRayCount => HorizontalRayCount * VerticalRayCount;
     private int VisualPointCount => Mathf.Min(maxPoints, TotalRayCount);
     private float ScanInterval => scanHz > 0f ? 1f / scanHz : 0f;
+
+    private bool PoolSizeChanged =>
+        quadPool.Count != VisualPointCount;
+
+    private bool ScanSettingsChanged =>
+        !Mathf.Approximately(horizontalAngleDeg, lastHorizontalAngleDeg) ||
+        !Mathf.Approximately(verticalAngleDeg, lastVerticalAngleDeg) ||
+        !Mathf.Approximately(raysPerDegree, lastRaysPerDegree) ||
+        maxPoints != lastMaxPoints;
 
     private void Start()
     {
@@ -49,24 +64,28 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
         AttachGlobalSettingsIfNeeded();
         AttachPointCloudRootIfNeeded();
+        PullGlobalSettings();
         RebuildPool();
+        SnapshotSettings();
         BeginNewSweep();
     }
 
     private void Update()
     {
-        if (globalSettings != null)
-        {
-            horizontalAngleDeg = globalSettings.HorizontalAngleDeg;
-            verticalAngleDeg = globalSettings.VerticalAngleDeg;
-            raysPerDegree = globalSettings.RaysPerDegree;
-            maxDistance = globalSettings.MaxDistance;
-        }
+        PullGlobalSettings();
 
-        if (quadPool.Count != VisualPointCount)
+        if (ScanSettingsChanged)
         {
-            RebuildPool();
+            bool needsRebuild = PoolSizeChanged;
+
+            SnapshotSettings();
+
+            if (needsRebuild)
+                RebuildPool();
+
+            HideAllQuads();
             BeginNewSweep();
+            return;
         }
 
         if (scanHz <= 0f)
@@ -81,21 +100,34 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         }
     }
 
+    private void PullGlobalSettings()
+    {
+        if (globalSettings == null) return;
+
+        horizontalAngleDeg = globalSettings.HorizontalAngleDeg;
+        verticalAngleDeg = globalSettings.VerticalAngleDeg;
+        raysPerDegree = globalSettings.RaysPerDegree;
+        maxDistance = globalSettings.MaxDistance;
+    }
+
+    private void SnapshotSettings()
+    {
+        lastHorizontalAngleDeg = horizontalAngleDeg;
+        lastVerticalAngleDeg = verticalAngleDeg;
+        lastRaysPerDegree = raysPerDegree;
+        lastMaxPoints = maxPoints;
+    }
+
     private void AttachGlobalSettingsIfNeeded()
     {
-        if (globalSettings != null)
-            return;
+        if (globalSettings != null) return;
 
         GameObject settingsObject = GameObject.Find(globalSettingsObjectName);
         if (settingsObject != null)
-        {
             globalSettings = settingsObject.GetComponent<SolidLidarGlobalSettings>();
-        }
 
         if (globalSettings == null)
-        {
             globalSettings = FindFirstObjectByType<SolidLidarGlobalSettings>();
-        }
 
         Debug.Log(
             globalSettings != null
@@ -107,11 +139,9 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
     private void AttachPointCloudRootIfNeeded()
     {
-        if (pointCloudRoot != null)
-            return;
+        if (pointCloudRoot != null) return;
 
         GameObject rootObject = GameObject.Find(pointCloudRootObjectName);
-
         if (rootObject != null)
         {
             pointCloudRoot = rootObject.transform;
@@ -130,8 +160,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
     private void ScanNextRows()
     {
-        if (VerticalRayCount <= 0 || HorizontalRayCount <= 0)
-            return;
+        if (VerticalRayCount <= 0 || HorizontalRayCount <= 0) return;
 
         Vector3 origin = transform.position;
         int rowsThisStep = Mathf.Max(1, rowsPerUpdate);
@@ -140,8 +169,8 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         {
             if (currentRow >= VerticalRayCount)
             {
-                BeginNewSweep(); // resets currentRow = 0, nextQuadIndex = 0
-                                 // Don't return — continue scanning from row 0
+                HideQuadsFrom(nextQuadIndex);
+                BeginNewSweep();
             }
 
             float vT = VerticalRayCount <= 1 ? 0.5f : (float)currentRow / (VerticalRayCount - 1);
@@ -151,7 +180,6 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
             {
                 if (nextQuadIndex >= quadPool.Count)
                 {
-                    // Pool exhausted mid-row — begin new sweep next tick
                     currentRow = VerticalRayCount;
                     return;
                 }
@@ -197,7 +225,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     {
         if (pointCloudRoot == null)
         {
-            Debug.LogError($"[{name}] Cannot rebuild pool because PointCloudRoot is missing.", this);
+            Debug.LogError($"[{name}] Cannot rebuild pool — PointCloudRoot is missing.", this);
             enabled = false;
             return;
         }
@@ -221,33 +249,35 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         Debug.Log($"[{name}] Rebuilt quad pool with {VisualPointCount} points.", this);
     }
 
+    private void HideAllQuads()
+    {
+        for (int i = 0; i < quadPool.Count; i++)
+        {
+            if (quadPool[i] != null)
+                quadPool[i].SetActive(false);
+        }
+    }
+
+    private void HideQuadsFrom(int startIndex)
+    {
+        for (int i = startIndex; i < quadPool.Count; i++)
+        {
+            if (quadPool[i] != null)
+                quadPool[i].SetActive(false);
+        }
+    }
 
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;
         Gizmos.matrix = transform.localToWorldMatrix;
 
-        float previewLength = Mathf.Min(maxDistance * 0.25f, 3f);
+        const float previewLength = 3f;
 
-        Vector3 bottomLeft = DirectionFromAngles(
-            -horizontalAngleDeg * 0.5f,
-            -verticalAngleDeg * 0.5f
-        ) * previewLength;
-
-        Vector3 bottomRight = DirectionFromAngles(
-            horizontalAngleDeg * 0.5f,
-            -verticalAngleDeg * 0.5f
-        ) * previewLength;
-
-        Vector3 topRight = DirectionFromAngles(
-            horizontalAngleDeg * 0.5f,
-            verticalAngleDeg * 0.5f
-        ) * previewLength;
-
-        Vector3 topLeft = DirectionFromAngles(
-            -horizontalAngleDeg * 0.5f,
-            verticalAngleDeg * 0.5f
-        ) * previewLength;
+        Vector3 bottomLeft = DirectionFromAngles(-horizontalAngleDeg * 0.5f, -verticalAngleDeg * 0.5f) * previewLength;
+        Vector3 bottomRight = DirectionFromAngles(horizontalAngleDeg * 0.5f, -verticalAngleDeg * 0.5f) * previewLength;
+        Vector3 topRight = DirectionFromAngles(horizontalAngleDeg * 0.5f, verticalAngleDeg * 0.5f) * previewLength;
+        Vector3 topLeft = DirectionFromAngles(-horizontalAngleDeg * 0.5f, verticalAngleDeg * 0.5f) * previewLength;
 
         Gizmos.DrawLine(Vector3.zero, bottomLeft);
         Gizmos.DrawLine(Vector3.zero, bottomRight);
