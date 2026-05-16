@@ -13,6 +13,7 @@ Builds/
 
 # Visual Studio / Rider
 .vs/
+.vscode
 *.csproj
 *.sln
 *.user
