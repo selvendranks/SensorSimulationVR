@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class PointCloudMesher : MonoBehaviour
+public class BallPivotingMeshGenerator : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Sonar sonar;
