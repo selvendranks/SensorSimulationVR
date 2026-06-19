@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class SolidStateLidarQuadVisualizer : MonoBehaviour
@@ -27,6 +27,11 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     [SerializeField] private SolidLidarGlobalSettings globalSettings;
     [SerializeField] private string globalSettingsObjectName = "SolidLidarGlobalSettings";
 
+    [Header("Point Cloud Recorder")]
+    [SerializeField] private string pointCloudRecorderObjectName = "PointCloudRecorder";
+
+    private PointCloudRecorder pointCloudRecorder;
+
     private readonly List<GameObject> quadPool = new();
     private float scanTimer;
     private int currentRow;
@@ -47,6 +52,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
 
         AttachGlobalSettingsIfNeeded();
         AttachPointCloudRootIfNeeded();
+        AttachPointCloudRecorderIfNeeded();
         BuildPool();
     }
 
@@ -145,6 +151,11 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
                     quad.transform.localScale = Vector3.one * quadSize;
                     quad.SetActive(true);
 
+                    // ── NEW: record point ──────────────────────────────
+                    if (pointCloudRecorder != null)
+                        pointCloudRecorder.RecordPoint(hit.point);
+                    // ──────────────────────────────────────────────────
+
                     nextQuadIndex = (nextQuadIndex + 1) % quadPool.Count;
                 }
             }
@@ -169,7 +180,7 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
     {
         if (pointCloudRoot == null)
         {
-            Debug.LogError($"[{name}] Cannot build pool � PointCloudRoot is missing.", this);
+            Debug.LogError($"[{name}] Cannot build pool — PointCloudRoot is missing.", this);
             enabled = false;
             return;
         }
@@ -209,5 +220,24 @@ public class SolidStateLidarQuadVisualizer : MonoBehaviour
         Gizmos.DrawLine(bottomRight, topRight);
         Gizmos.DrawLine(topRight, topLeft);
         Gizmos.DrawLine(topLeft, bottomLeft);
+    }
+
+    private void AttachPointCloudRecorderIfNeeded()
+    {
+        if (pointCloudRecorder != null) return;
+
+        GameObject recorderObject = GameObject.Find(pointCloudRecorderObjectName);
+        if (recorderObject != null)
+        {
+            pointCloudRecorder = recorderObject.GetComponent<PointCloudRecorder>();
+            Debug.Log($"[{name}] Attached PointCloudRecorder: {recorderObject.name}", this);
+            return;
+        }
+
+        if (pointCloudRecorder == null)
+            pointCloudRecorder = FindFirstObjectByType<PointCloudRecorder>();
+
+        if (pointCloudRecorder == null)
+            Debug.LogWarning($"[{name}] PointCloudRecorder '{pointCloudRecorderObjectName}' not found in scene.", this);
     }
 }
