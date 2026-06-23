@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(git merge --abort)",
+      "PowerShell(git fetch origin)",
+      "PowerShell(git reset --hard origin/main)"
+    ]
+  }
+}
