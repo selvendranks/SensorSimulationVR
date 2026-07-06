@@ -68,8 +68,8 @@ public class VehicleXRPauseInput : MonoBehaviour
 
     private void Update()
     {
-        // rotate/spin wheels around x-axis
-        if (cachedSpeed>0) {
+        if (!isPaused)
+        {
             bottom_left.transform.Rotate(200f * Time.deltaTime, 0, 0);
             bottom_right.transform.Rotate(200f * Time.deltaTime, 0, 0);
             top_left.transform.Rotate(200f * Time.deltaTime, 0, 0);
