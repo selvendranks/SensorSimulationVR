@@ -8,52 +8,37 @@ public class VehicleXRPauseInput : MonoBehaviour
     [SerializeField] private SplineFollower splineFollower;
     [SerializeField] private InputActionReference leftSelectAction;
 
-    // wheels
+    [Header("Wheels")]
     [SerializeField] private GameObject bottom_left;
     [SerializeField] private GameObject bottom_right;
     [SerializeField] private GameObject top_left;
     [SerializeField] private GameObject top_right;
 
+    private GameObject[] wheels;
     private float cachedSpeed;
     private bool isPaused;
-
 
     private void Awake()
     {
         if (splineFollower == null)
             splineFollower = FindFirstObjectByType<SplineFollower>();
 
-        // move all wheel-children to their parent's position
-        int bl_len = bottom_left.transform.childCount;
-        int br_len = bottom_right.transform.childCount;
-        int tl_len = top_left.transform.childCount;
-        int tr_len = top_right.transform.childCount;
+        wheels = new GameObject[] { bottom_left, bottom_right, top_left, top_right };
 
-        int max_len = Math.Max(Math.Max(bl_len, br_len), Math.Max(tl_len, tr_len));
-        for (int i = 0; i < max_len; i++)
+        foreach (var wheel in wheels)
         {
-            if (i < bl_len)
+            if (wheel == null)
+                continue;
+
+            int childCount = wheel.transform.childCount;
+            for (int i = 0; i < childCount; i++)
             {
-                GameObject bl_child = bottom_left.transform.GetChild(i).gameObject;
-                bl_child.transform.position = bottom_left.transform.position;
-            }
-            if (i < br_len)
-            {
-                GameObject br_child = bottom_right.transform.GetChild(i).gameObject;
-                br_child.transform.position = bottom_right.transform.position;
-            }
-            if (i < tl_len)
-            {
-                GameObject tl_child = top_left.transform.GetChild(i).gameObject;
-                tl_child.transform.position = top_left.transform.position;
-            }
-            if (i < tr_len)
-            {
-                GameObject tr_child = top_right.transform.GetChild(i).gameObject;
-                tr_child.transform.position = top_right.transform.position;
+                Transform child = wheel.transform.GetChild(i);
+                child.position = wheel.transform.position;
             }
         }
     }
+
     private void Start()
     {
         if (splineFollower == null)
@@ -68,12 +53,17 @@ public class VehicleXRPauseInput : MonoBehaviour
 
     private void Update()
     {
-        if (!isPaused)
+        if (isPaused)
+            return;
+
+        float spin = 200f * Time.deltaTime;
+
+        foreach (var wheel in wheels)
         {
-            bottom_left.transform.Rotate(200f * Time.deltaTime, 0, 0);
-            bottom_right.transform.Rotate(200f * Time.deltaTime, 0, 0);
-            top_left.transform.Rotate(200f * Time.deltaTime, 0, 0);
-            top_right.transform.Rotate(200f * Time.deltaTime, 0, 0);
+            if (wheel == null)
+                continue;
+
+            wheel.transform.Rotate(spin, 0f, 0f);
         }
     }
 
