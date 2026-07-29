@@ -19,12 +19,21 @@ The project includes two sensing domains:
 The application is intended primarily as an **educational and interactive visualization tool**. It demonstrates scan coverage, blind zones, field of view, point density, range limitations, sensor placement, and basic point-cloud surface reconstruction.
 
 > [!IMPORTANT]
-> This project uses geometric raycasting for interactive sensor visualization. It is not intended to be a fully physically calibrated LiDAR or sonar simulator for real-world perception-model benchmarking.
+> This project uses geometric raycasting for interactive sensor visualization. It is not intended to be a fully physically calibrated LiDAR simulator for real-world perception-model benchmarking.
 
-## Demo
-(https://drive.google.com/file/d/1X3CHW7tq7UvQ7loeGz-uShBdd0GrY_V0/view?usp=sharing)
+## Demo Video
 
-<img width="1330" height="651" alt="image" src="https://github.com/user-attachments/assets/f132a09d-2744-48ca-9c6c-18a76edea5f9" />
+Click the preview below to watch the full VR sensor-simulation demonstration.
+
+<a href="https://drive.google.com/file/d/1X3CHW7tq7UvQ7loeGz-uShBdd0GrY_V0/view?usp=sharing">
+  <img
+    width="1330"
+    height="651"
+    alt="Watch the Sensor Simulation in VR demo"
+    src="https://github.com/user-attachments/assets/db86189d-4a97-4057-9c03-919dfb4ca636"
+  />
+</a>
+
 <img width="1205" height="652" alt="image" src="https://github.com/user-attachments/assets/fa6b811e-ec40-4d91-a2a9-de8c6b9d9bc1" />
 <img width="515" height="346" alt="Screenshot 2026-07-09 140240" src="https://github.com/user-attachments/assets/440092d8-d44c-4472-8e97-12c5c4e18e85" />
 <img width="1697" height="716" alt="Screenshot 2026-07-09 133006" src="https://github.com/user-attachments/assets/d2bc5a4f-2bc6-4a37-9a60-ff7a91908854" />
